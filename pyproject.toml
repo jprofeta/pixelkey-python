@@ -1,0 +1,27 @@
+[build-system]
+requires = [ "setuptools>=61.0", "wheel", "read_version>=0.3.2" ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixelkey"
+description = "PixelKey controller and API"
+readme = "README.md"
+requires-python = ">=3.8.0"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "pyserial>=3.4"
+]
+dynamic = [ "version" ]
+
+[tool.read_version]
+version = "src.pixelkey._version:__version__"
+
+[tool.setuptools.packages.find]
+where = [ "src" ]
+
+[tool.pydocstyle]
+convention = "google"
+add-select = [ "D123" ]
+add-ignore = [ "D202", "D203", "D212" ]
