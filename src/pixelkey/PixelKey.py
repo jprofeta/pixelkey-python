@@ -3,7 +3,7 @@ import time
 from typing import Any, Union
 from serial import Serial
 
-from pixelkey import PixelKeyError, ErrorCode
+from pixelkey import PixelKeyError, ErrorCode, Keyframe
 
 class PixelKey:
     """PixelKey Controller API"""
@@ -50,6 +50,10 @@ class PixelKey:
     def __exit__(self, type, value, tb):
         self.close()
 
+    def close(self):
+        """Close the internal serial port."""
+        self.__serial.close()
+
     def execute(self, cmd_str:'str') -> 'str | None':
         """Executes a command string."""
         self.__serial.write(cmd_str.encode(encoding="ascii") + b'\n')
@@ -72,9 +76,9 @@ class PixelKey:
                         return response[:line_start].decode(encoding='ascii')
         raise TimeoutError()
 
-    def close(self):
-        """Close the internal serial port."""
-        self.__serial.close()
+    def push_keyframe(self, keyframe:'Keyframe'):
+        """Pushes a keyframe to the PixelKey."""
+        self.execute(keyframe.get_command())
 
     def config_set(self, key:'str', value:'Union[int,float,bool]'):
         """Set a configuration value for the attached PixelKey.
