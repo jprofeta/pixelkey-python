@@ -12,7 +12,7 @@ class Keyframe:
         if repeat_count is not None and not isinstance(repeat_count, int):
             raise TypeError('count must be None or int.')
 
-        if len(index_list) == 0 or not all([isinstance(x, int) for x in index_list]):
+        if index_list is not None and (len(index_list) == 0 or not all(isinstance(x, int) or isinstance(x,tuple) for x in index_list)):
             raise ValueError('index_list must include at least one element and must be all ints')
 
         self.__name = name
@@ -29,11 +29,11 @@ class Keyframe:
         """Gets the NeoPixel index list to which apply this keyframe."""
         return self.__index_list
 
-    @index_list.getter
+    @index_list.setter
     def index_list(self, index:'Optional[list[int]]'):
         if index is not None and not isinstance(index, list):
             raise TypeError('index_list must be a list of int.')
-        if len(index) == 0 or not all([isinstance(x, int) for x in index]):
+        if len(index) == 0 or not all(isinstance(x, int) or isinstance(x,tuple) for x in index):
             raise ValueError('index_list must include at least one element and must be all ints')
         self.__index_list = index
 
@@ -63,7 +63,7 @@ class Keyframe:
 
         # Add the index list if provided
         if self.index_list is not None:
-            cmd_str += ' '.join(self.index_list)
+            cmd_str += ','.join(str(x) if isinstance(x,int) else str(x[0]) + '-' + str(x[1]) for x in self.index_list) + ' '
 
         # Build the rest of the command
         cmd_str += f'{self.name} {self._get_argument_string()}'
