@@ -1,4 +1,5 @@
 import re
+import time
 from typing import Any, Union
 from serial import Serial
 
@@ -7,11 +8,10 @@ from pixelkey import PixelKeyError, ErrorCode
 class PixelKey:
     """PixelKey Controller API"""
 
-    _nak_pattern = re.compile(r'^(?P<code>\d+) NAK$')
-    _version_pattern = re.compile(r'^PixelKey v(?P<version>.+)$')
+    _version_pattern = re.compile(r'^PixelKey v(?P<version>.+).*')
 
     def __init__(self, port:'str'):
-        self.__serial = Serial(None, rtscts=False, xonxoff=False, dsrdtr=False)
+        self.__serial = Serial(None, timeout=0, rtscts=False, xonxoff=False, dsrdtr=False)
         # Make sure the control lines are not asserted to keep the PixelKey from
         # thinking this is a terminal connection.
         self.__serial.rts = False
@@ -32,7 +32,7 @@ class PixelKey:
         if m is None:
             self.__serial.close()
             raise PixelKeyError(ErrorCode.NONE, 'Status check failed.')
-        self.__version = m.group('version')
+        self.__firmware_version = m.group('version')
 
     @property
     def is_open(self)->'bool':
@@ -40,9 +40,9 @@ class PixelKey:
         return self.__serial.is_open
 
     @property
-    def version(self)->'str':
+    def firmware_version(self)->'str':
         """Gets the firmware version of the attached PixelKey."""
-        return self.__version
+        return self.__firmware_version
 
     def __enter__(self):
         return self
@@ -53,18 +53,24 @@ class PixelKey:
     def execute(self, cmd_str:'str') -> 'str | None':
         """Executes a command string."""
         self.__serial.write(cmd_str.encode(encoding="ascii") + b'\n')
-        response = self.__serial.read_until().decode(encoding="ascii")
-
-        if (nak := PixelKey._nak_pattern.match(response)) is not None:
-            raise PixelKeyError(ErrorCode(int(nak.group('code'))))
-
-        if response.startswith('OK'):
-            return None
         
-        rest = self.__serial.read_until('OK\n').decode(encoding="ascii")
-        response += rest[:-3]   # Remove the OK\n from the response
+        # Read until NAK or OK
+        response = b''
+        timeout = time.monotonic_ns() + 250000000   # 250 ms timeout
+        while time.monotonic_ns() < timeout:
+            if self.__serial.in_waiting > 0:
+                response += self.__serial.read()
+                # Check for the end of the response
+                if response[-1] == b'\n'[0]:
+                    line_start = response.rfind(b'\n', 0, -1)
+                    if line_start == -1:
+                        line_start = 0
 
-        return response.strip()
+                    if response.endswith(b' NAK\n'):
+                        raise PixelKeyError(ErrorCode(int(response[line_start:-5]))) # Ignore ' NAK\n' at the end
+                    elif response.endswith(b'OK\n'):
+                        return response[:line_start].decode(encoding='ascii')
+        raise TimeoutError()
 
     def close(self):
         """Close the internal serial port."""
